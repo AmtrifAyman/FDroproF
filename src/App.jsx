@@ -10,8 +10,34 @@ const CHUNK_SIZE = 16 * 1024; // 16 KB
 
 const iceServersConfig = {
   iceServers: [
+    // STUN Servers l-9dam dyalek
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    
+    // TURN w STUN Servers jdad dyal Metered
+    {
+      urls: "stun:stun.relay.metered.ca:80",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:80",
+      username: "84d7592dc865003ad57488f3",
+      credential: "5+om+ityjX66yc/J",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:80?transport=tcp",
+      username: "84d7592dc865003ad57488f3",
+      credential: "5+om+ityjX66yc/J",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:443",
+      username: "84d7592dc865003ad57488f3",
+      credential: "5+om+ityjX66yc/J",
+    },
+    {
+      urls: "turns:global.relay.metered.ca:443?transport=tcp",
+      username: "84d7592dc865003ad57488f3",
+      credential: "5+om+ityjX66yc/J",
+    },
   ]
 };
 
