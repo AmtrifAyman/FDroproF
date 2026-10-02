@@ -4,7 +4,7 @@ import Peer from 'simple-peer';
 import { QRCodeSVG } from 'qrcode.react';
 
 // Lien dyal Railway (Bdlo b dyalek ila tbdel)
-const socket = io('https://LIEN-DYAL-RAILWAY-HNA.up.railway.app'); 
+const socket = io('fdropro-production.up.railway.app'); 
 
 const CHUNK_SIZE = 16 * 1024; // 16 KB
 
