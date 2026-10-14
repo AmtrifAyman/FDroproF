@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import Peer from 'simple-peer';
 import { QRCodeSVG } from 'qrcode.react';
+import { Analytics } from '@vercel/analytics/react';
 
 // Lien dyal Railway (Bdlo b dyalek ila tbdel)
 const socket = io('fdropro-production.up.railway.app'); 
@@ -411,6 +412,7 @@ export default function App() {
             </p>
         </div>
       </footer>
+      <Analytics />
     </div>
   );
 }
