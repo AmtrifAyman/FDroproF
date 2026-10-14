@@ -46,6 +46,9 @@ export default function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [darkMode, setDarkMode] = useState(false);
   const [roomId, setRoomId] = useState('');
+  const [roomCodeInput, setRoomCodeInput] = useState('');
+  const [roomCodeError, setRoomCodeError] = useState('');
+  const [codeCopied, setCodeCopied] = useState(false);
   const [connected, setConnected] = useState(false);
   const [message, setMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -128,18 +131,25 @@ export default function App() {
       } catch (e) {}
     };
 
+    const handleRoomError = ({ message: errorMessage }) => setRoomCodeError(errorMessage);
+    socket.on('room-error', handleRoomError);
+
     if (roomFromUrl) {
-      setRoomId(roomFromUrl);
-      socket.emit('join-room', roomFromUrl);
+      const normalizedRoomId = roomFromUrl.trim().toUpperCase();
+      setRoomId(normalizedRoomId);
+      socket.emit('join-room', normalizedRoomId);
       const peer = new Peer({ initiator: true, trickle: false, config: iceServersConfig });
-      peer.on('signal', (signal) => socket.emit('send-signal', { roomId: roomFromUrl, signal }));
+      peer.on('signal', (signal) => socket.emit('send-signal', { roomId: normalizedRoomId, signal }));
       peer.on('connect', () => setConnected(true));
       peer.on('data', handleIncomingData);
       socket.on('receive-signal', (data) => peer.signal(data.signal));
       peerRef.current = peer;
     } else {
-      const newRoomId = Math.random().toString(36).substring(2, 8);
+      const randomValue = new Uint32Array(1);
+      window.crypto.getRandomValues(randomValue);
+      const newRoomId = String(100000 + (randomValue[0] % 900000));
       setRoomId(newRoomId);
+      setCodeCopied(false);
       socket.emit('join-room', newRoomId);
 
       socket.on('receive-signal', (data) => {
@@ -154,8 +164,32 @@ export default function App() {
       });
     }
 
-    return () => socket.off('receive-signal');
+    return () => {
+      socket.off('receive-signal');
+      socket.off('room-error', handleRoomError);
+    };
   }, [currentView]);
+
+  const joinRoomByCode = (event) => {
+    event.preventDefault();
+    const code = roomCodeInput.trim();
+    if (!/^\d{6}$/.test(code)) {
+      setRoomCodeError('Enter a valid 6-digit room code.');
+      return;
+    }
+    setRoomCodeError('');
+    window.history.pushState({}, '', `/?room=${code}`);
+    setCurrentView('room');
+  };
+
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setCodeCopied(true);
+    } catch {
+      setRoomCodeError('Unable to copy the room code. Please copy it manually.');
+    }
+  };
 
   const sendMessage = () => {
     if (peerRef.current && message.trim()) {
@@ -265,6 +299,33 @@ export default function App() {
                         <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
                     </svg>
                 </button>
+
+                <div className="mt-8 w-full max-w-lg rounded-3xl border border-purple-100 bg-purple-50/50 p-6 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                    <label htmlFor="room-code" className="mb-3 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                        Have a room code?
+                    </label>
+                    <form onSubmit={joinRoomByCode} className="flex flex-col gap-3 sm:flex-row">
+                        <input
+                            id="room-code"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={roomCodeInput}
+                            onChange={(event) => {
+                                setRoomCodeInput(event.target.value.replace(/\D/g, '').slice(0, 6));
+                                setRoomCodeError('');
+                            }}
+                            placeholder="Enter 6-digit code"
+                            aria-describedby={roomCodeError ? 'room-code-error' : undefined}
+                            className="min-w-0 flex-1 rounded-xl border border-purple-100 bg-white px-4 py-3 font-medium tracking-widest outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-purple-900"
+                        />
+                        <button type="submit" className="rounded-xl bg-purple-600 px-5 py-3 font-bold text-white transition-colors hover:bg-purple-700">
+                            Connect / Join Room
+                        </button>
+                    </form>
+                    {roomCodeError && <p id="room-code-error" role="alert" className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">{roomCodeError}</p>}
+                </div>
             </section>
         )}
 
@@ -288,13 +349,25 @@ export default function App() {
                         </div>
                         <h3 className="font-bold text-xl mb-3">{connected ? 'Devices Paired' : 'Pair Device'}</h3>
                         <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
-                            {connected ? 'Secure P2P connection established. Ready to transfer.' : "Scan this QR code with your phone to join the secure room."}
+                            {connected ? 'Secure P2P connection established. Ready to transfer.' : "Scan the QR code or enter the room code on another device."}
                         </p>
+                        {roomCodeError && <p role="alert" className="mb-4 text-sm font-medium text-red-600 dark:text-red-400">{roomCodeError}</p>}
                         
                         {!connected && !window.location.search.includes('room') && (
-                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-purple-100 dark:border-none mb-4">
-                                <QRCodeSVG value={link} size={160} className="w-full h-auto" />
-                            </div>
+                            <>
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-purple-100 dark:border-none mb-5">
+                                    <QRCodeSVG value={link} size={160} className="w-full h-auto" />
+                                </div>
+                                <div className="w-full rounded-2xl border border-purple-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                                    <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Room Code / PIN</p>
+                                    <div className="flex items-center justify-center gap-3">
+                                        <span className="font-mono text-3xl font-extrabold tracking-[0.2em] text-purple-700 dark:text-purple-300">{roomId}</span>
+                                        <button onClick={copyRoomCode} className="rounded-lg bg-purple-100 px-3 py-2 text-sm font-bold text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/70">
+                                            {codeCopied ? 'Copied!' : 'Copy Code'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                     
